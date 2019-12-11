@@ -1,0 +1,3 @@
+/home/noa/CLionProjects/AdvancedPro/FlightSimulator/Part 1/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/home/noa/CLionProjects/AdvancedPro/FlightSimulator/Part 1/cmake-build-debug/CMakeFiles/Part_1.dir
+/home/noa/CLionProjects/AdvancedPro/FlightSimulator/Part 1/cmake-build-debug/CMakeFiles/edit_cache.dir
