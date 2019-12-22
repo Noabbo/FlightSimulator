@@ -5,9 +5,12 @@
 #ifndef PART_1_OPENSERVERCOMMAND_H
 #define PART_1_OPENSERVERCOMMAND_H
 
-
-class OpenServerCommand {
-
+#include <string>
+#include "Command.h"
+class OpenServerCommand : public Command {
+public:
+    virtual int execute(string parameters);
+    virtual ~OpenServerCommand();
 };
 
 
