@@ -27,13 +27,37 @@
 #include "Mul.h"
 #include "Div.h"
 #include "Interpreter.h"
+#define OPEN_SERVER_COMMAND_RET_VALUE 2
 using namespace std;
-vector<string> lexer(fstream file);
+unordered_map<string, Command*> commands;
+list<Variable> vars;
+unordered_map<string, typename list<Variable>::iterator> vars_map;
+unordered_map<string, typename list<Variable>::iterator> sim_map;
+unordered_map<string, FuncCommand> func_map;
+mutex mutex_lock;
+vector<string> lexer(string file_name);
 void openServer(int port);
+// class of open server command
 class OpenServerCommand : public Command {
 public:
     virtual int execute(string parameters);
 
 };
+// class of define var command
+class DefineVarCommand : public Command {
+public:
+    virtual int execute(string parameters);
+};
+// class of set var command
+class SetVarCommand : public Command {
+    virtual int execute(string parameters);
+};
 
+class DefineFuncCommand : public Command {
+    virtual int execute(string parameters);
+};
+
+class FuncCommand : public Command {
+    virtual int execute(string parameters);
+};
 #endif //PART_1_SERVER_H

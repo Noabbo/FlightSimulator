@@ -18,6 +18,22 @@ double Variable::calculate() {
     return this->value;
 }
 
+bool Variable::getUpdateSim() {
+    return this->updateSim;
+}
+
+string Variable::getSim() {
+    return this->sim;
+}
+
+double Variable::setValue() {
+    return this->value;
+}
+
+void Variable::setValue(double v) {
+    this->value = v;
+}
+
 //operators
 Variable& Variable::operator+=(const double v) const {
     Variable *newVar = new Variable(this->name, this->value + v, this->updateSim, this->sim);

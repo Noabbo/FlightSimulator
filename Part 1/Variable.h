@@ -16,6 +16,10 @@ class Variable : public Expression {
 public:
     Variable(string n, double v, bool b, string s);
     double calculate();
+    bool getUpdateSim();
+    string getSim();
+    double getValue();
+    void setValue(double v);
     Variable& operator+=(const double v) const;
     Variable& operator-=(const double v) const;
     Variable& operator++() const;

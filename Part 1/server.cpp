@@ -3,32 +3,34 @@
 //
 
 #include "server.h"
-#define OPEN_SERVER_COMMAND_RET_VALUE 2
-unordered_map<string, Command*> commands;
-list<Variable> vars;
-unordered_map<string, typename list<Variable>::iterator> vars_map;
-unordered_map<string, typename list<Variable>::iterator> sim_map;
-mutex mutex_lock;
 int main(int argc, char* argv[]) {
-    // open file sent in argument
-    fstream text;
-    text.open(argv[1], ios::in | ios::binary);
-    if (!text) {
-        throw "error - file could not open";
-    }
     // lexer
     vector<string> parameters = lexer(text);
     return 0;
 }
 
-vector<string> lexer(fstream file) {
+vector<string> lexer(string file_name) {
     vector<string> v;
     string line;
+    string openDataServer = "openDataServer";
+    string connectControlClient = "connectControlClient";
+    string var = "var";
+    string Print = "Print";
+    string Sleep = "Sleep";
+    // open file sent in argument
+    fstream text;
+    text.open(file_name, ios::in | ios::binary);
+    if (!text) {
+        throw "error - file could not open";
+    }
     getline(file, line);
     while (!line.empty()) {
+        if (line.find("openDataServer")) {
 
+        }
         getline(file, line);
     }
+    text.close();
     return v;
 }
 
@@ -51,4 +53,27 @@ void openServer(int port) {
     address.sin_port = htons(port);
 
     mutex_lock.unlock();
+}
+
+int DefineVarCommand::execute(string parameters) {
+
+}
+
+int SetVarCommand::execute(string parameters) {
+    // extracting the name and new value of variable
+    size_t pos = parameters.find("=");
+    string name = parameters.substr(0, pos);
+    string exp = parameters.substr(pos + 1);
+    // calculating new value of variable
+    Interpreter i = new Interpreter(vars_map);
+    Expression* e = i.interpret(exp);
+    double value = e->calculate();
+    // set new value in map
+    vars_map.at(name).setValue(value);
+    // simulator needs to be updated
+    if (vars_map.find(name).getUpdateSim()) {
+        string updateSimulator = "set" + vars_map.find(name).getSim() + " " + to_string(vars_map.find(name).getValue());
+        // send setting of variable to simulator
+        // Fanny - please dp that
+    }
 }
