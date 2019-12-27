@@ -4,11 +4,12 @@
 
 #include "Interpreter.h"
 // constructor
-Interpreter::Interpreter(unordered_map<string, Variable> vars_map) {
-    this->variables = vars_map;
+Interpreter::Interpreter(unordered_map<string, typename list<Variable>::iterator> vars_map, list<Variable> v) {
+    this->variables = std::move(vars_map);
+    this->vars = std::move(v);
 }
 Expression* Interpreter::interpret(string equation) {
-    Expression *final;
+    Expression *final = nullptr;
     list <string> stack;
     list <Expression*> finalStack;
     queue <string> tokens;
@@ -17,7 +18,7 @@ Expression* Interpreter::interpret(string equation) {
     if (isStringValid(equation)) {
         for (unsigned int i = 0; i < equation.length(); i++) {
             // space
-            if (equation[i] == " ") {
+            if ((isspace(equation[i])) || (equation[i] == '\t')) {
                 continue;
             }
             // number
@@ -98,7 +99,9 @@ Expression* Interpreter::interpret(string equation) {
                     name.clear();
                 }
                 name.insert(0, tokens.front());
-                Expression *e = variables.at(tokens.front());
+                double value = variables.at(tokens.front())->getValue();
+                Expression *e = new Variable(tokens.front(), value,
+                        variables.at(tokens.front())->getUpdateSim(), variables.at(tokens.front())->getSim());
                 finalStack.push_back(e);
                 tokens.pop();
                 // token is an operand
@@ -179,7 +182,7 @@ bool Interpreter::isOpMorePrecedent(char op, string check) {
 
 bool Interpreter::isStringValid(string equation) {
     // spaces are allowed
-    if (equation[0] == " ") {
+    if ((isspace(equation[0])) || (equation[0] == '\t')) {
         string part = equation.substr(1, string::npos);
         return isStringValid(part);
     }

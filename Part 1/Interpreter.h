@@ -11,6 +11,7 @@
 #include <list>
 #include <unordered_map>
 #include <queue>
+#include <utility>
 #include "Expression.h"
 #include "Value.h"
 #include "Variable.h"
@@ -23,9 +24,10 @@
 #include "Mul.h"
 #include "Div.h"
 class Interpreter {
-    unordered_map<string, Variable> variables;
+    list<Variable> vars;
+    unordered_map<string, typename list<Variable>::iterator> variables;
 public:
-    Interpreter(unordered_map<string, Variable> vars_map);
+    Interpreter(unordered_map<string, typename list<Variable>::iterator> vars_map, list<Variable> v);
     Expression* interpret(string equation);
     bool isOpMorePrecedent(char op, string check);
     bool isStringValid(string equation);

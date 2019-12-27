@@ -26,7 +26,7 @@ string Variable::getSim() {
     return this->sim;
 }
 
-double Variable::setValue() {
+double Variable::getValue() {
     return this->value;
 }
 

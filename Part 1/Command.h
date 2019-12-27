@@ -5,11 +5,11 @@
 #ifndef PART_1_COMMAND_H
 #define PART_1_COMMAND_H
 #include <string>
-
+#include <vector>
 using namespace std;
 class Command {
 public:
-    virtual int execute(string parameters) = 0;
+    virtual int execute(vector<string> parameters) = 0;
     virtual ~Command() {};
 };
 
