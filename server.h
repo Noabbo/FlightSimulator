@@ -27,15 +27,12 @@
 #include "Minus.h"
 #include "Mul.h"
 #include "Div.h"
+#include "BooleanType.h"
 #include "Interpreter.h"
-#include <arpa/inet.h>
-#include "tinyxml2.h"
-
 #define OPEN_SERVER_COMMAND_RET_VALUE 2
-#define MAX_CONNECTED_CLIENTS 10
 #define CONNECT_COMMAND_RET_VALUE 3
-#define NUM_VARIABLE 36
 using namespace std;
+void init();
 vector<string> lexer(string file_name);
 vector<string> helpLexer(string line);
 string lowerCase(string s);
@@ -43,16 +40,19 @@ string upperCase(string s);
 string removeSpaces(string str);
 void parser(vector<string> coms);
 void openServer(int port);
-void connectClient(int port);
-void openDataServer();
-bool xmlParser();
-void Sleep(double number);
-void Print(string str);
 // class of open server command
 class OpenServerCommand : public Command {
 public:
     virtual int execute(vector<string> parameters);
     virtual ~OpenServerCommand() {delete this;};
+
+};
+// class of connect client command
+class ConnectCommand : public Command {
+public:
+    virtual int execute(vector<string> parameters);
+    virtual ~ConnectCommand() {delete this;};
+
 };
 // class of define var command
 class DefineVarCommand : public Command {
@@ -60,7 +60,20 @@ public:
     virtual int execute(vector<string> parameters);
     virtual ~DefineVarCommand() {delete this;};
 };
+// class of print command
+class PrintCommand : public Command {
+public:
+    virtual int execute(vector<string> parameters);
+    virtual ~PrintCommand() {delete this;};
 
+};
+// class of sleep command
+class SleepCommand : public Command {
+public:
+    virtual int execute(vector<string> parameters);
+    virtual ~SleepCommand() {delete this;};
+
+};
 class FuncCommand : public Command {
     vector<string> commands;
 public:
@@ -81,11 +94,10 @@ public:
     virtual int execute(vector<string> parameters);
     virtual ~WhileCommand() {delete this;};
 };
-
 unordered_map<string, Command*> commands;
 list<Variable> vars;
 unordered_map<string, typename list<Variable>::iterator> vars_map;
 unordered_map<string, typename list<Variable>::iterator> sim_map;
-unordered_map<string, FuncCommand> func_map;
+vector<string> funcs;
 mutex mutex_lock;
 #endif //PART_1_SERVER_H
