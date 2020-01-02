@@ -20,6 +20,8 @@ public:
     string getSim();
     double getValue();
     void setValue(double v);
+    void setUpdateSim(bool b);
+    void setSim(string s);
     Variable& operator+=(const double v) const;
     Variable& operator-=(const double v) const;
     Variable& operator++() const;
