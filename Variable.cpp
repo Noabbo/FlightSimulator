@@ -17,7 +17,7 @@ Variable::Variable(string n, double v, bool b, string s) {
 double Variable::calculate() {
     return this->value;
 }
-
+// getters
 bool Variable::getUpdateSim() {
     return this->updateSim;
 }
@@ -29,9 +29,17 @@ string Variable::getSim() {
 double Variable::getValue() {
     return this->value;
 }
-
+// setters
 void Variable::setValue(double v) {
     this->value = v;
+}
+
+void Variable::setUpdateSim(bool b) {
+    this->updateSim = b;
+}
+
+void Variable::setSim(string s) {
+    this->sim = s;
 }
 
 //operators
