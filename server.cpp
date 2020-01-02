@@ -4,6 +4,12 @@
 
 #include "server.h"
 int main(int argc, char* argv[]) {
+    // initialize map of commands
+    init();
+    // lexer
+    vector<string> parameters = lexer(argv[1]);
+    // parser
+    parser(parameters);
     return 0;
 }
 
