@@ -274,11 +274,6 @@ bool Interpreter::isStringValid(string equation) {
                     break;
                 }
                 case '-':
-                    // syntax error - no brackets before variable
-                    if (((equation[1] > 96) && (equation[1] < 123)) ||
-                        ((equation[1] > 64) && (equation[1] < 91))) {
-                        throw ("syntax error - no brackets before UMinus of variable");
-                    }
                     if ((equation[1] == '+') || (equation[1] == '-') ||
                         (equation[1] == '*') || (equation[1] == '/')) {
                         throw ("syntax error - two consecutive operands");
