@@ -3,10 +3,33 @@
 //
 
 #include "server.h"
+bool ClientIsConnected = true;
+bool ServerExist = true;
 int main(int argc, char* argv[]) {
+    // initialize map of commands
+    init();
+    //Ask noa where to put the function
+    openDataServer();
+    // lexer
+    vector<string> parameters = lexer(argv[1]);
+    //parser
+    parser(parameters);
     return 0;
 }
-
+// initialization of map of commands
+void init() {
+    Command *c = new OpenServerCommand();
+    commands.emplace(make_pair("openDataServer", c));
+    c = new ConnectCommand();
+    commands.emplace(make_pair("connectControlClient", c));
+    c = new DefineVarCommand();
+    commands.emplace(make_pair("var", c));
+    c = new PrintCommand();
+    commands.emplace(make_pair("Print", c));
+    c = new SleepCommand();
+    commands.emplace(make_pair("Sleep", c));
+}
+// lexer
 vector<string> lexer(string file_name) {
     vector<string> v;
     string line;
@@ -136,8 +159,24 @@ vector<string> helpLexer(string line) {
         }
         v.emplace_back("{");
     } else {
+        if (line.find("<") != string::npos) {
+            auto pos = line.find("<");
+            auto posEnd = pos;
+            auto cond = 1;
+            if (line.find("<=") != string::npos) {
+                posEnd += 1;
+                cond++;
+            }
+            string name = removeSpaces(line.substr(0, pos));
+            v.push_back(name);
+            string condition = removeSpaces(line.substr(pos, cond));
+            v.push_back(condition);
+            string value = removeSpaces(line.substr(posEnd+1));
+            v.push_back(value);
+            return v;
+        }
         // update var
-        if (line.find("=") != string::npos) {
+       else if (line.find("=") != string::npos) {
             auto pos = line.find("=");
             string name = removeSpaces(line.substr(0, pos));
             v.push_back(name);
@@ -159,20 +198,20 @@ vector<string> helpLexer(string line) {
 // turns string's letters to all lower cases
 string lowerCase(string s) {
     string newString;
-    for (int i = 0; i < s.size(); i++) {
-        newString.push_back(::tolower(s[i]));
+    for (char i : s) {
+        newString.push_back(::tolower(i));
     }
     return newString;
 }
 // turns string's letters to all upper cases
 string upperCase(string s) {
     string newString;
-    for (int i = 0; i < s.size(); i++) {
-        newString.push_back(::tolower(s[i]));
+    for (char i : s) {
+        newString.push_back(::tolower(i));
     }
     return newString;
 }
-
+// removes excess spaces and tabs in lines extracted from text file
 string removeSpaces(string str) {
     string newStr;
     for (char i : str) {
@@ -182,21 +221,82 @@ string removeSpaces(string str) {
     }
     return newStr;
 }
-
+// parser
 void parser(vector<string> coms) {
-
+    int i = 0;
+    vector<string> param;
+    while (i < coms.size()) {
+        // get command
+        Command *c = commands[coms[i]];
+        // finding parameters for commands
+        if (coms[i] == "openDataServer") {
+            param.push_back(coms[i + 1]);
+            i += c->execute(param);
+        } else if (coms[i] == "connectControlClient") {
+            param.push_back(coms[i + 1]);
+            param.push_back(coms[i + 2]);
+            i += c->execute(param);
+        } else if (coms[i] == "var") {
+            // undeclared variable
+            if (coms[i + 2] == "=") {
+                for (int j = 0; j < 4; j++) {
+                    param.push_back(coms[i+j]);
+                }
+            } else {
+                for (int j = 0; j < 5; j++) {
+                    param.push_back(coms[i+j]);
+                }
+            }
+            i += c->execute(param);
+        } else if ((coms[i] == "Print") || (coms[i] == "Sleep")) {
+            param.push_back(coms[i + 1]);
+            i += c->execute(param);
+        } else if (func_map.find(coms[i]) != func_map.end()) {
+            // declared function
+            // enter variable
+            param.push_back(coms[++i]);
+            i += c->execute(param);
+        } else if (vars_map.find(coms[i]) != vars_map.end()) {
+            // declared variable
+            for (int j = 0; j < 2; j++) {
+                param.push_back(coms[i+j]);
+            }
+            DefineVarCommand *varC = new DefineVarCommand;
+            i += varC->execute(param);
+        } else if (coms[i+2] == "{") {
+            // undeclared function
+            param = findBlock(coms, i);
+            FuncCommand *funcC = new FuncCommand(param);
+            i += funcC->execute(param);
+        } else {
+            throw "error - no matching command found";
+        }
+    }
+    ClientIsConnected = false;
+    ServerExist = false;
 }
-
+// enters a block to a vector
+vector<string> findBlock(vector<string> coms, int pos) {
+    vector<string> param;
+    // entering condition and block to vector
+    while (coms[pos] != "}") {
+        param.push_back(coms[pos++]);
+    }
+    // enter end of block
+    param.emplace_back("}");
+    return param;
+}
+// command to create and connect server
 int OpenServerCommand::execute(vector<string> parameters) {
-    int port = stoi(parameters[0]);
+    double num = parameters.size() - 1;
+    int port = stoi(parameters[num]);
     thread serverth(openServer, port);
-    serverth.join();
+    serverth.detach();
     return OPEN_SERVER_COMMAND_RET_VALUE;
 }
 
 //Create the server
 void openServer(int port) {
-
     //Creation of the socket
     char buffer[255];
     int socketfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -208,12 +308,10 @@ void openServer(int port) {
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_addr.s_addr = INADDR_ANY;
     serverAddress.sin_port = htons(port);
-
     //Case the bind socket doesn't bind to the IP address
     if (bind(socketfd, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) == -1) {
         throw "Could not bind the socket to an IP";
     }
-
     //Socket listen to the port
     if (listen(socketfd, 5) == -1) {
         throw "Error during listening command";
@@ -223,45 +321,40 @@ void openServer(int port) {
     if (client_socket == -1) {
         throw "Error- didn't accept client";
     }
-
     // The server keep listening to the client.
-    while (true){
+    while (ServerExist) {
         //Wait to listen from the client.
         recv(socketfd, buffer, sizeof(buffer), 0);
         if (buffer[0] == '\0') {
-            cout << "waiting" << endl;
+
         }
-        //The client succeed to connect.
+            //The client succeed to connect.
         else {
             cout << "Connection server succeeded" << endl;
         }
     }
-
     close(socketfd);
 }
 
 //Create connection with the server
-void connectClient(int port) {
+void connectClient(const char *IP, int port) {
     //Creation of the socket
     int client_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (client_socket == -1) {
         throw "error - could not create a socket";
     }
-
     sockaddr_in address;
     address.sin_family = AF_INET;
-    address.sin_addr.s_addr = inet_addr("127.0.0.1");
+    address.sin_addr.s_addr = inet_addr(IP);
     address.sin_port = htons(port);
-
     //Request a connection with the server on local host, try until the connection is made.
-    while (true) {
+    while (ClientIsConnected) {
         int is_connected = connect(client_socket, (struct sockaddr *) &address, sizeof(address));
         if (is_connected == -1) {
             cout << "error - could not connected to host server" << endl;
             sleep(1);
         } else {
             cout << "Connection succeeded" << endl;
-            break;
         }
     }
     //Close the socket whe the connection is done.
@@ -270,7 +363,6 @@ void connectClient(int port) {
 
 void openDataServer() {
     xmlParser();
-
 }
 bool xmlParser() {
     tinyxml2::XMLDocument xml_doc;
@@ -291,7 +383,7 @@ bool xmlParser() {
     }
 
     //Enter all our variables into our map.
-    typename list<Variable>::iterator>;
+   // typename list<Variable>::iterator>;
     while (eResult != EOF) {
         string name  = element->FirstChildElement("name")->GetText();
         string type  = element->FirstChildElement("type")->GetText();
@@ -307,23 +399,84 @@ bool xmlParser() {
     }
 
 }
-
+// command that defines a new or existing variable
 int DefineVarCommand::execute(vector<string> parameters) {
     string name;
+    double num = parameters.size();
+    double result = 0;
     // define new variable
-    if (parameters[0] == "var") {
-        name = parameters[1];
-        if (parameters[2] == "=") {
-
+    if (parameters[num - 5] == "var") {
+        num = num - 5;
+        result = 5;
+        name = parameters[num + 1];
+       /* if (parameters[num + 2] == "=") {
+            // creating new local variable
+            auto i = new Interpreter(vars_map, vars);
+            Expression* e = i->interpret(parameters[num + 3]);
+            double value = e->calculate();
+            auto *v = new Variable(name, value, false, "");
+            // add new variable to list and map
+            vars.push_back(*v);
+            auto it = prev(vars.end());
+            vars_map.emplace(make_pair(name, it));
+        } else */if (parameters[num + 2] == "->") {
+            // extracting the sum path
+            string sim = parameters[num + 4].substr(1);
+            sim.pop_back();
+            // new variable - create new one in list and map
+            if (vars_map.find(name) == vars_map.end()) {
+                auto *v = new Variable(name, 0, true, sim);
+                // add new variable to list and maps
+                vars.push_back(*v);
+                auto it = prev(vars.end());
+                vars_map.emplace(make_pair(name, it));
+                sim_map.emplace(make_pair(sim, it));
+            } else {
+                // update boolean type and sim path in variable
+                vars_map.at(name)->setUpdateSim(true);
+                vars_map.at(name)->setSim(sim);
+            }
+        } else {
+            // parameters[2] = "<-"
+            // update path to simulator in variable
+            string sim = parameters[4].substr(1);
+            sim.pop_back();
+            // new variable - create new one in list and map
+            if (vars_map.find(name) == vars_map.end()) {
+                auto *v = new Variable(name, 0, false, sim);
+                // add new variable to list and map
+                vars.push_back(*v);
+                auto it = prev(vars.end());
+                vars_map.emplace(make_pair(name, it));
+                sim_map.emplace(make_pair(sim, it));
+            } else {
+                // update sim path in variable
+                vars_map.at(name)->setSim(sim);
+            }
         }
-        for (int i = 1; i < parameters.size(); i++) {
-
+    } else if (parameters[num - 4] == "var") {
+        num = num - 4;
+        name = parameters[num + 1];
+        if (parameters[num + 2] == "=") {
+            // creating new local variable
+            auto i = new Interpreter(vars_map, vars);
+            Expression *e = i->interpret(parameters[num + 3]);
+            double value = e->calculate();
+            auto *v = new Variable(name, value, false, "");
+            // add new variable to list and map
+            vars.push_back(*v);
+            auto it = prev(vars.end());
+            vars_map.emplace(make_pair(name, it));
+            result = 4;
         }
+
     } else {
         // update existing variable
         // extracting the name and new value of variable
-        name = parameters[0];
-        string exp = parameters[1];
+        double num = parameters.size() - 2;
+        name = parameters[num];
+        string exp = parameters[num + 1];
+        result = 2;
         // calculating new value of variable
         auto i = new Interpreter(vars_map, vars);
         Expression* e = i->interpret(exp);
@@ -338,24 +491,133 @@ int DefineVarCommand::execute(vector<string> parameters) {
             updateSimulator += to_string(vars_map.at(name)->getValue());
             updateSimulator += "\r\n";
             // send setting of variable to simulator
-            // Fanny - please dp that
+            // Fanny - please do that
         }
     }
-    return parameters.size() + 1;
+    return result;
+}
+int ConnectCommand::execute(vector<string> parameters) {
+    double num = parameters.size() - 2;
+    string IP = parameters[num];
+    int port = stoi(parameters[num + 1]);
+    thread serverth(connectClient, IP.c_str(), port);
+    serverth.join();
+    return CONNECT_COMMAND_RET_VALUE;
 }
 
-int IfCommand::execute(vector<string> parameters) {
-    return parameters.size();
+// constructor for func command
+FuncCommand::FuncCommand(vector<string> c) {
+    this->commands = c;
 }
-
+// func command - bonus!
 int FuncCommand::execute(vector<string> parameters) {
 
-    return parameters.size();
+    if (parameters[1] == "{") {
+        auto f = func_map.at(parameters[0]);
+        Interpreter *i = new Interpreter(vars_map, vars);
+        Expression *e = i->interpret(parameters[1]);
+        double var = e->calculate();
+        f.executeFunc(parameters[0], var);
+        // run function
+        return 1;
+    } else {
+        // if or while
+        if ((parameters[0] == "if") || (parameters[0] == "while")) {
+            Interpreter *i = new Interpreter(vars_map, vars);
+            string cond = parameters[1];
+            vector<string> condition = helpLexer(cond);
+            // left part of the condition
+            Expression *l = i->interpret(condition[0]);
+            // right part of the condition
+            Expression *r = i->interpret(condition[2]);
+            BooleanType *boo = new BooleanType(l, r, condition[1]);
+            // condition is true
+            if (boo->calculate() == 1) {
+                blockParser(parameters, true);
+            } else {
+                // condition is false
+                throw "condition is false";
+            }
+        } else {
+            // declare function
+            string name = parameters[0];
+            vector<string> block;
+            // create block of function
+            for (int j = 1; j < parameters.size(); j++) {
+                block.push_back(parameters[j]);
+            }
+            // create new func
+            auto *f = new FuncCommand(block);
+            // add new func to map
+            func_map.emplace(make_pair(name, *f));
+        }
+    }
+    return parameters.size() + 2;
 }
 
-void Sleep(double number) {
-    sleep(number);
+void FuncCommand::executeFunc(string name, double var) {
+    // change every declared variable in func to its value
+    for (string s : this->commands) {
+        while (s.find(name) != string::npos) {
+            auto pos = s.find(name);
+            s.replace(pos, name.size(), to_string(var));
+        }
+    }
+    // execute function
+    blockParser(this->commands, false);
 }
+
+// calls parser for a block
+void blockParser(vector<string> parameters, bool ifOrWhile) {
+    // remove variable from parameters
+    parameters.erase(parameters.begin());
+    if (ifOrWhile) {
+        // remove condition and "if" or "while" from parameters
+        parameters.erase(parameters.begin());
+    }
+    // run the commands in block until '}'
+    int pos = 0;
+    while (pos < parameters.size()) {
+        // skip opening bracket
+        if (parameters[pos] != "{") {
+            // execute commands in block
+            parameters.pop_back();
+            parser(parameters);
+        } else {
+            parameters.erase(parameters.begin());
+        }
+        pos++;
+    }
+}
+// sleep command
+int SleepCommand::execute(vector<string> parameters) {
+    double num = parameters.size() - 1;
+    Interpreter *i = new Interpreter(vars_map, vars);
+    Expression *e = i->interpret(parameters[num]);
+    double time = e->calculate();
+    Sleep(time);
+    return 2;
+}
+// sleep
+void Sleep(double time) {
+    sleep(time);
+}
+// print command
+int PrintCommand::execute(vector<string> parameters) {
+    double num = parameters.size() - 1;
+    Print(parameters[num]);
+    return 2;
+}
+// print
 void Print(string str) {
-    cout << str << endl;
+    // string to print
+    if (str.at(0) == '"') {
+        cout << str << endl;
+    } else {
+        // expression to calculate and print result
+        auto *i = new Interpreter(vars_map, vars);
+        Expression *e = i->interpret(str);
+        double num = e->calculate();
+        cout << num << endl;
+    }
 }
