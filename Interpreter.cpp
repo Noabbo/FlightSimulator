@@ -4,9 +4,8 @@
 
 #include "Interpreter.h"
 // constructor
-Interpreter::Interpreter(unordered_map<string, typename list<Variable>::iterator> vars_map, list<Variable> v) {
+Interpreter::Interpreter(unordered_map<string, Variable> vars_map) {
     this->variables = std::move(vars_map);
-    this->vars = std::move(v);
 }
 Expression* Interpreter::interpret(string equation) {
     Expression *final = nullptr;
@@ -99,9 +98,9 @@ Expression* Interpreter::interpret(string equation) {
                     name.clear();
                 }
                 name.insert(0, tokens.front());
-                double value = variables.at(tokens.front())->getValue();
-                Expression *e = new Variable(tokens.front(), value,
-                        variables.at(tokens.front())->getUpdateSim(), variables.at(tokens.front())->getSim());
+                double value = variables.at(tokens.front()).getValue();
+                Expression *e = new Variable(tokens.front(), value, variables.at(tokens.front()).getUpdateSimulator(),
+                         variables.at(tokens.front()).getPath());
                 finalStack.push_back(e);
                 tokens.pop();
                 // token is an operand

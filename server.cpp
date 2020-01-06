@@ -3,13 +3,19 @@
 //
 
 #include "server.h"
+bool ClientDone = false;
+bool ServerExist = true;
 int main(int argc, char* argv[]) {
-    // initialize map of commands
-    init();
-    // lexer
-    vector<string> parameters = lexer(argv[1]);
-    // parser
-    parser(parameters);
+    try {
+        // initialize map of commands
+        init();
+        // lexer
+        vector<string> parameters = lexer(argv[1]);
+        //parser
+        parser(parameters);
+    } catch (char const* e) {
+        cout << e << endl;
+    }
     return 0;
 }
 // initialization of map of commands
@@ -155,8 +161,24 @@ vector<string> helpLexer(string line) {
         }
         v.emplace_back("{");
     } else {
+        if (line.find("<") != string::npos) {
+            auto pos = line.find("<");
+            auto posEnd = pos;
+            auto cond = 1;
+            if (line.find("<=") != string::npos) {
+                posEnd += 1;
+                cond++;
+            }
+            string name = removeSpaces(line.substr(0, pos));
+            v.push_back(name);
+            string condition = removeSpaces(line.substr(pos, cond));
+            v.push_back(condition);
+            string value = removeSpaces(line.substr(posEnd+1));
+            v.push_back(value);
+            return v;
+        }
         // update var
-        if (line.find("=") != string::npos) {
+       else if (line.find("=") != string::npos) {
             auto pos = line.find("=");
             string name = removeSpaces(line.substr(0, pos));
             v.push_back(name);
@@ -202,77 +224,116 @@ string removeSpaces(string str) {
     return newStr;
 }
 // parser
-void parser(vector<string> coms) {
+void parser(vector<string> rawConfig) {
     int i = 0;
-    vector<string> param;
-    while (i < coms.size()) {
-        // get command
-        Command *c = commands[coms[i]];
+    int server_port = 0;
+    pair<string, int> client_config;
+    while (i < rawConfig.size()) {
         // finding parameters for commands
-        if (coms[i] == "openDataServer") {
-            param.push_back(coms[i+OPEN_SERVER_COMMAND_RET_VALUE]);
-            i += c->execute(param);
-        } else if (coms[i] == "connectControlClient") {
-            param.push_back(coms[i+CONNECT_COMMAND_RET_VALUE]);
-            i += c->execute(param);
-        } else if (coms[i] == "var") {
-            // undeclared variable
-            if (coms[i+2] == "=") {
-                for (int j = 0; j < 4; j++) {
-                    param.push_back(coms[i+j]);
+        if (rawConfig[i] == "openDataServer") {
+            server_port = stoi(rawConfig[i + 1]);
+            Command *c = commands[rawConfig[i]];
+            vector<string> param;
+            param.push_back(to_string(server_port));
+            c->execute(param);
+            i += OPEN_SERVER_COMMAND_RET_VALUE;
+
+        } else if (rawConfig[i] == "connectControlClient") {
+            string IP = rawConfig[i + 1].substr(1);
+            IP.pop_back();
+            client_config = make_pair(IP , stoi(rawConfig[i + 2]));
+            i += CONNECT_COMMAND_RET_VALUE;
+
+        } else if (rawConfig[i] == "var") {
+            // Creation of new variable from preexisting variable
+            if (rawConfig[i + 2] == "=") {
+                vector<string> command;
+                for (int j = 0; j < ALIAS_RET_VALUE; j++) {
+                    command.push_back(rawConfig[i + j]);
                 }
-            } else {
-                for (int j = 0; j < 5; j++) {
-                    param.push_back(coms[i+j]);
-                }
+                game_operation.push_back(command);
+                i += ALIAS_RET_VALUE;
+
             }
-            i += c->execute(param);
-        } else if ((coms[i] == "Print") || (coms[i] == "Sleep")) {
-            param.push_back(coms[i+1]);
-            i += c->execute(param);
-        } else if (func_map.find(coms[i]) != func_map.end()) {
+            else {
+                //Initialisation of the variables
+                Command *c = new DefineVarCommand();
+                vector<string> command;
+                for (int j = 0; j < NEW_VARIABLE_RET_VALUE; j++) {
+                    command.push_back(rawConfig[i + j]);
+                }
+                //Add to the map the new variable
+                c->execute(command);
+                i += NEW_VARIABLE_RET_VALUE;
+            }
+        }
+        else if ((rawConfig[i] == "Print") || (rawConfig[i] == "Sleep")) {
+            vector<string> command;
+            for (int j = 0; j < PRINT_SLEEP_FUNC_RET_VALUE; j++) {
+                command.push_back(rawConfig[i + j]);
+            }
+            game_operation.push_back(command);
+            i += PRINT_SLEEP_FUNC_RET_VALUE;
+        } else if (rawConfig[i + 2] == "{") {
+            // undeclared function
+            vector<string> block = findBlock(rawConfig, i);
+            block.insert(block.begin(), "FuncCommand");
+            game_operation.push_back(block);
+            i += block.size() - 1;
+        } else if (func_map.find(rawConfig[i]) != func_map.end()) {
             // declared function
             // enter variable
-            param.push_back(coms[++i]);
-            i += c->execute(param);
-        } else if (vars_map.find(coms[i]) != vars_map.end()) {
-            // declared variable
-            for (int j = 0; j < 3; j++) {
-                param.push_back(coms[i+j]);
+            vector<string> func;
+            func.insert(func.begin(), "FuncCommand");
+            for (int j = 0; j < PRINT_SLEEP_FUNC_RET_VALUE; j++) {
+                func.push_back(rawConfig[i + j]);
             }
-            i += c->execute(param);
-        } else if (coms[i+2] == "{") {
-            // undeclared function
-            param = findBlock(coms, i);
-            i += c->execute(param);
-        } else {
+            game_operation.push_back(func);
+            i += PRINT_SLEEP_FUNC_RET_VALUE;
+
+        } else if (game_configuration.find(rawConfig[i]) != game_configuration.end()) {
+            // declared variable
+            vector<string> var;
+            var.insert(var.begin(), "DefineVarCommand");
+            for (int j = 0; j < NEW_VALUE_OF_VARIABLE_RET_VALUE; j++) {
+                var.push_back(rawConfig[i + j]);
+            }
+            game_operation.push_back(var);
+            i += NEW_VALUE_OF_VARIABLE_RET_VALUE;
+        }  else {
             throw "error - no matching command found";
         }
     }
+    thread serverth(openServer, server_port);
+    thread clientth(connectClient, client_config.first.c_str(), client_config.second, game_configuration, game_operation);
+    clientth.join();
+    serverth.join();
 }
+
 // enters a block to a vector
 vector<string> findBlock(vector<string> coms, int pos) {
     vector<string> param;
     // entering condition and block to vector
     while (coms[pos] != "}") {
-        param.push_back(coms[++pos]);
+        param.push_back(coms[pos++]);
     }
+
     // enter end of block
     param.emplace_back("}");
     return param;
 }
 // command to create and connect server
-int OpenServerCommand::execute(vector<string> parameters) {
-    int port = stoi(parameters[0]);
-    thread serverth(openServer, port);
-    serverth.join();
-    return OPEN_SERVER_COMMAND_RET_VALUE;
+string OpenServerCommand::execute(vector<string> parameters) {
+    xmlParser();
+    return "";
 }
+
 
 //Create the server
 void openServer(int port) {
+
     //Creation of the socket
-    char buffer[255];
+    char buffer[1024];
     int socketfd = socket(AF_INET, SOCK_STREAM, 0);
     if (socketfd == -1) {
         throw "error - could not create a socket";
@@ -282,6 +343,7 @@ void openServer(int port) {
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_addr.s_addr = INADDR_ANY;
     serverAddress.sin_port = htons(port);
+
     //Case the bind socket doesn't bind to the IP address
     if (bind(socketfd, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) == -1) {
         throw "Could not bind the socket to an IP";
@@ -291,27 +353,52 @@ void openServer(int port) {
         throw "Error during listening command";
     }
     //Accepting the client
+    cout << "Waiting for acceptation " << port << endl;
     int client_socket = accept(socketfd, (struct sockaddr *) &serverAddress, (socklen_t *) &serverAddress);
     if (client_socket == -1) {
         throw "Error- didn't accept client";
     }
+
     // The server keep listening to the client.
-    while (true) {
+    while (ServerExist) {
         //Wait to listen from the client.
-        recv(socketfd, buffer, sizeof(buffer), 0);
-        if (buffer[0] == '\0') {
-            cout << "waiting" << endl;
+        int res = read(client_socket, buffer, sizeof(buffer) - 1);
+
+
+        if (buffer[0] != '\0') {
+            mutex_lock.lock();
+            vector<Variable>::iterator it;
+            int i = 0;
+            //Create the string we receive from the buffer
+            for (it = orderVars.begin(); it != orderVars.end(); it++) {
+                string bufferLine = "";
+                while (buffer[i] != ',') {
+                    bufferLine += buffer[i];
+                    i++;
+                }
+                cout << buffer << endl;
+                //Split the "."
+                i++;
+                //Update each element of our map with the value receive from the server.
+                string name = it->getName();
+                it->setValue(atof(bufferLine.c_str()));
+                Variable *v;
+                *v = game_configuration.at(name);
+                v->setValue(atof(bufferLine.c_str()));
+            }
+
+            mutex_lock.unlock();
         }
-            //The client succeed to connect.
-        else {
-            cout << "Connection server succeeded" << endl;
+        if (ClientDone) {
+            break;
         }
     }
     close(socketfd);
 }
 
 //Create connection with the server
-void connectClient(int port) {
+void connectClient(const char *IP, int port,  unordered_map<string, Variable> game_configuration,
+        vector<vector<string>> game_operation) {
     //Creation of the socket
     int client_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (client_socket == -1) {
@@ -319,30 +406,68 @@ void connectClient(int port) {
     }
     sockaddr_in address;
     address.sin_family = AF_INET;
-    address.sin_addr.s_addr = inet_addr("127.0.0.1");
+   // address.sin_addr.s_addr = inet_addr(IP);
     address.sin_port = htons(port);
+    cout << "Client " << IP <<" " << port << endl;
+
+    if(inet_pton(AF_INET, IP, &address.sin_addr) <= 0) {
+        cout << "Client Error" << IP <<" " << port << endl;
+
+        throw("Invalid address - Address not supported");
+    }
     //Request a connection with the server on local host, try until the connection is made.
     while (true) {
         int is_connected = connect(client_socket, (struct sockaddr *) &address, sizeof(address));
+        cout << "Client is connected "<< is_connected << endl;
         if (is_connected == -1) {
-            cout << "error - could not connected to host server" << endl;
             sleep(1);
         } else {
-            cout << "Connection succeeded" << endl;
-            break;
+            //Send information to our server
+            for (int i = 0;  i < game_operation.size(); ++i) {
+                string opType = game_operation[i].front();
+                Command *c = commands[opType];
+
+                if (c == nullptr) {
+                    if (opType == "FuncCommand") {
+
+                        game_operation[i].erase(game_operation[i].begin());
+                        c = new FuncCommand(game_operation[i]);
+                        c->execute(game_operation[i]);
+                    } else if (opType == "DefineVarCommand") {
+                        game_operation[i].erase(game_operation[i].begin());
+                        c = new DefineVarCommand();
+                        mutex_lock.lock();
+                        string updateSimulator = c->execute(game_operation[i]);
+                        mutex_lock.unlock();
+                        if (!updateSimulator.empty()) {
+                            auto return_val = write(client_socket, updateSimulator.c_str(), updateSimulator.size());
+                        }
+                    }
+                } else {
+                    mutex_lock.lock();
+                    c->execute(game_operation[i]);
+                    mutex_lock.unlock();
+                }
+            }
+
+            if (game_operation.empty()){
+                cout << "Connection Over " << endl;
+                break;
+            }
         }
+        //Close the socket whe the connection is done or do not succeed.
+        close(client_socket);
     }
-    //Close the socket whe the connection is done.
+    //Close the socket whe the connection is done or do not succeed.
     close(client_socket);
+    ClientDone = true;
+
 }
 
-void openDataServer() {
-    xmlParser();
-}
 bool xmlParser() {
     tinyxml2::XMLDocument xml_doc;
 
-    tinyxml2::XMLError eResult = xml_doc.LoadFile("/home/fanny/Documents/Advance conding/FlightSimulator-master..Noa upgrates.28.01/FlightSimulator-master/Part 1/generic_small.xml");
+    tinyxml2::XMLError eResult = xml_doc.LoadFile("generic_small.xml");
     if (eResult != tinyxml2::XML_SUCCESS) {
         return false;
     }
@@ -358,54 +483,48 @@ bool xmlParser() {
     }
 
     //Enter all our variables into our map.
-    typename list<Variable>::iterator>;
-    while (eResult != EOF) {
+    while (element != nullptr) {
         string name  = element->FirstChildElement("name")->GetText();
         string type  = element->FirstChildElement("type")->GetText();
         string format  = element->FirstChildElement("format")->GetText();
         string node  = element->FirstChildElement("node")->GetText();
         Variable *variable = new Variable(name, 0, false, node);
-        vars.push_back(*variable);
-        vars_map.emplace(make_pair(name, prev(vars.end())));
-        sim_map.emplace(make_pair(node, prev(vars.end())));
-
-        cout << name << type << format << node << endl;
+        orderVars.push_back(*variable);
+        game_configuration.emplace(make_pair(name, *variable));
         element = element->NextSiblingElement();
     }
 
 }
+
 // command that defines a new or existing variable
-int DefineVarCommand::execute(vector<string> parameters) {
+string DefineVarCommand::execute(vector<string> parameters) {
+
     string name;
     // define new variable
     if (parameters[0] == "var") {
         name = parameters[1];
         if (parameters[2] == "=") {
             // creating new local variable
-            auto i = new Interpreter(vars_map, vars);
+            auto i = new Interpreter(game_configuration);
             Expression* e = i->interpret(parameters[3]);
             double value = e->calculate();
             auto *v = new Variable(name, value, false, "");
-            // add new variable to list and map
-            vars.push_back(*v);
-            auto it = prev(vars.end());
-            vars_map.emplace(make_pair(name, it));
+            // add new variable to map
+            game_configuration.emplace(make_pair(name, *v));
         } else if (parameters[2] == "->") {
             // extracting the sum path
             string sim = parameters[4].substr(1);
             sim.pop_back();
             // new variable - create new one in list and map
-            if (vars_map.find(name) == vars_map.end()) {
+            if (game_configuration.find(name) == game_configuration.end()) {
                 auto *v = new Variable(name, 0, true, sim);
-                // add new variable to list and maps
-                vars.push_back(*v);
-                auto it = prev(vars.end());
-                vars_map.emplace(make_pair(name, it));
-                sim_map.emplace(make_pair(sim, it));
+                // add new variable to map
+                orderVars.push_back(*v);
+                game_configuration.emplace(make_pair(name, *v));
             } else {
                 // update boolean type and sim path in variable
-                vars_map.at(name)->setUpdateSim(true);
-                vars_map.at(name)->setSim(sim);
+                game_configuration.at(name).setUpdateSimulator(true);
+                game_configuration.at(name).setPath(sim);
             }
         } else {
             // parameters[2] = "<-"
@@ -413,16 +532,14 @@ int DefineVarCommand::execute(vector<string> parameters) {
             string sim = parameters[4].substr(1);
             sim.pop_back();
             // new variable - create new one in list and map
-            if (vars_map.find(name) == vars_map.end()) {
+            if (game_configuration.find(name) == game_configuration.end()) {
                 auto *v = new Variable(name, 0, false, sim);
-                // add new variable to list and map
-                vars.push_back(*v);
-                auto it = prev(vars.end());
-                vars_map.emplace(make_pair(name, it));
-                sim_map.emplace(make_pair(sim, it));
+                // add new variable to map
+                orderVars.push_back(*v);
+                game_configuration.emplace(make_pair(name, *v));
             } else {
                 // update sim path in variable
-                vars_map.at(name)->setSim(sim);
+                game_configuration.at(name).setPath(sim);
             }
         }
     } else {
@@ -431,43 +548,49 @@ int DefineVarCommand::execute(vector<string> parameters) {
         name = parameters[0];
         string exp = parameters[1];
         // calculating new value of variable
-        auto i = new Interpreter(vars_map, vars);
+        auto i = new Interpreter(game_configuration);
         Expression* e = i->interpret(exp);
         double value = e->calculate();
         // set new value in map
-        vars_map.at(name)->setValue(value);
+        game_configuration.at(name).setValue(value);
         // simulator needs to be updated
-        if (vars_map.at(name)->getUpdateSim()) {
+        if (game_configuration.at(name).getUpdateSimulator()) {
             string updateSimulator = "set";
-            updateSimulator += vars_map.at(name)->getSim();
+            updateSimulator += game_configuration.at(name).getPath();
             updateSimulator += " ";
-            updateSimulator += to_string(vars_map.at(name)->getValue());
+            updateSimulator += to_string(game_configuration.at(name).getValue());
             updateSimulator += "\r\n";
-            // send setting of variable to simulator
-            // Fanny - please do that
+            return updateSimulator;
         }
     }
-    return parameters.size() + 1;
+    return "";
+
+}
+
+string ConnectCommand::execute(vector<string> parameters) {
+    return "";
 }
 
 // constructor for func command
 FuncCommand::FuncCommand(vector<string> c) {
     this->commands = c;
 }
+
 // func command - bonus!
-int FuncCommand::execute(vector<string> parameters) {
-    if (parameters[1] != "{") {
+string FuncCommand::execute(vector<string> parameters) {
+
+    if (parameters[2] != "{") {
         auto f = func_map.at(parameters[0]);
-        Interpreter *i = new Interpreter(vars_map, vars);
+        Interpreter *i = new Interpreter(game_configuration);
         Expression *e = i->interpret(parameters[1]);
         double var = e->calculate();
         f.executeFunc(parameters[0], var);
         // run function
-        return 1;
+        return "";
     } else {
         // if or while
         if ((parameters[0] == "if") || (parameters[0] == "while")) {
-            Interpreter *i = new Interpreter(vars_map, vars);
+            Interpreter *i = new Interpreter(game_configuration);
             string cond = parameters[1];
             vector<string> condition = helpLexer(cond);
             // left part of the condition
@@ -496,7 +619,7 @@ int FuncCommand::execute(vector<string> parameters) {
             func_map.emplace(make_pair(name, *f));
         }
     }
-    return parameters.size() + 2;
+    return "";
 }
 
 void FuncCommand::executeFunc(string name, double var) {
@@ -521,42 +644,42 @@ void blockParser(vector<string> parameters, bool ifOrWhile) {
     }
     // run the commands in block until '}'
     int pos = 0;
-    while (parameters[pos] != "}") {
+    while (pos < parameters.size()) {
         // skip opening bracket
         if (parameters[pos] != "{") {
             // execute commands in block
+            parameters.pop_back();
             parser(parameters);
+        } else {
+            parameters.erase(parameters.begin());
         }
         pos++;
     }
 }
 // sleep command
-int SleepCommand::execute(vector<string> parameters) {
-    Interpreter *i = new Interpreter(vars_map, vars);
-    Expression *e = i->interpret(parameters[0]);
-    double num = e->calculate();
-    Sleep(num);
-    return 1;
+string SleepCommand::execute(vector<string> parameters) {
+    double num = parameters.size() - 1;
+    Interpreter *i = new Interpreter(game_configuration);
+    Expression *e = i->interpret(parameters[num]);
+    double time = e->calculate();
+    sleep(time);
+    return "";
 }
-// sleep
-void Sleep(double number) {
-    sleep(number);
-}
+
 // print command
-int PrintCommand::execute(vector<string> parameters) {
-    Print(parameters[0]);
-    return 1;
-}
-// print
-void Print(string str) {
+string PrintCommand::execute(vector<string> parameters) {
+    double num = parameters.size() - 1;
     // string to print
-    if (str.at(0) == '"') {
+    if (parameters[num].at(0) == '"') {
+        string str = parameters[num].substr(1);
+        str.pop_back();
         cout << str << endl;
     } else {
         // expression to calculate and print result
-        auto *i = new Interpreter(vars_map, vars);
-        Expression *e = i->interpret(str);
+        auto *i = new Interpreter(game_configuration);
+        Expression *e = i->interpret(parameters[num]);
         double num = e->calculate();
         cout << num << endl;
     }
+    return "";
 }

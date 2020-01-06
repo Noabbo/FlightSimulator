@@ -33,9 +33,12 @@
 #include "tinyxml2.h"
 
 #define OPEN_SERVER_COMMAND_RET_VALUE 2
-#define MAX_CONNECTED_CLIENTS 10
 #define CONNECT_COMMAND_RET_VALUE 3
-#define NUM_VARIABLE 36
+#define NEW_VARIABLE_RET_VALUE 5
+#define PRINT_SLEEP_FUNC_RET_VALUE 2
+#define NEW_VALUE_OF_VARIABLE_RET_VALUE 2
+#define ALIAS_RET_VALUE 4
+
 using namespace std;
 void init();
 vector<string> lexer(string file_name);
@@ -46,42 +49,40 @@ string removeSpaces(string str);
 void parser(vector<string> coms);
 vector<string> findBlock(vector<string> coms, int pos);
 void openServer(int port);
-void connectClient(int port);
-void openDataServer();
+void connectClient(const char *IP, int port,  unordered_map<string, Variable> game_configuration,
+        vector<vector<string>> game_value);
 bool xmlParser();
-void Sleep(double number);
-void Print(string str);
 void blockParser(vector<string> parameters, bool ifOrWhile);
 // class of open server command
 class OpenServerCommand : public Command {
 public:
-    virtual int execute(vector<string> parameters);
+    virtual string execute(vector<string> parameters);
     virtual ~OpenServerCommand() {delete this;};
 };
 // class of connect client command
 class ConnectCommand : public Command {
 public:
-    virtual int execute(vector<string> parameters);
+    virtual string execute(vector<string> parameters);
     virtual ~ConnectCommand() {delete this;};
 
 };
 // class of define var command
 class DefineVarCommand : public Command {
 public:
-    virtual int execute(vector<string> parameters);
+    virtual string execute(vector<string> parameters);
     virtual ~DefineVarCommand() {delete this;};
 };
 // class of print command
 class PrintCommand : public Command {
 public:
-    virtual int execute(vector<string> parameters);
+    virtual string execute(vector<string> parameters);
     virtual ~PrintCommand() {delete this;};
 
 };
 // class of sleep command
 class SleepCommand : public Command {
 public:
-    virtual int execute(vector<string> parameters);
+    virtual string execute(vector<string> parameters);
     virtual ~SleepCommand() {delete this;};
 
 };
@@ -89,15 +90,15 @@ class FuncCommand : public Command {
     vector<string> commands;
 public:
     FuncCommand(vector<string> c);
-    virtual int execute(vector<string> parameters);
+    virtual string execute(vector<string> parameters);
     void executeFunc(string name, double var);
     virtual ~FuncCommand() {delete this;};
 };
 
 unordered_map<string, Command*> commands;
-list<Variable> vars;
-unordered_map<string, typename list<Variable>::iterator> vars_map;
-unordered_map<string, typename list<Variable>::iterator> sim_map;
+vector<Variable> orderVars;
+unordered_map<string, Variable> game_configuration;
+vector<vector<string>> game_operation;
 unordered_map<string, FuncCommand> func_map;
 mutex mutex_lock;
 #endif //PART_1_SERVER_H

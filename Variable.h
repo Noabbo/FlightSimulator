@@ -11,17 +11,18 @@
 class Variable : public Expression {
     string name;
     double value;
-    bool updateSim;
-    string sim;
+    string path;
+    bool updateSimulator;
 public:
-    Variable(string n, double v, bool b, string s);
+    Variable(string n, double v,bool b, string s);
     double calculate();
-    bool getUpdateSim();
-    string getSim();
+    string getPath();
     double getValue();
+    string getName();
+    bool getUpdateSimulator();
     void setValue(double v);
-    void setUpdateSim(bool b);
-    void setSim(string s);
+    void setUpdateSimulator(bool b);
+    void setPath(string s);
     Variable& operator+=(const double v) const;
     Variable& operator-=(const double v) const;
     Variable& operator++() const;
