@@ -455,6 +455,7 @@ void connectClient(const char *IP, int port,  unordered_map<string, Variable> ga
 
 }
 
+// run the commands in txt file
 void runExecute(vector<string> parameters, int client_socket) {
     string opType = parameters.front();
     Command *c = commands_map[opType];
@@ -482,6 +483,7 @@ void runExecute(vector<string> parameters, int client_socket) {
     }
 }
 
+// translates the xml file
 bool xmlParser() {
     tinyxml2::XMLDocument xml_doc;
 
@@ -612,7 +614,7 @@ FuncCommand::FuncCommand(vector<string> c) {
     this->commands = c;
 }
 
-// func command - bonus!
+// execute func command - bonus!
 string FuncCommand::execute(vector<string> parameters) {
     //Give the socket of the client
     int client_socket = stoi(parameters[0]);
@@ -668,6 +670,7 @@ string FuncCommand::execute(vector<string> parameters) {
     return "";
 }
 
+// initializing new function
 void FuncCommand::initFunc(vector<string> parameters) {
     // declare function
     string name = parameters[0];
@@ -682,6 +685,7 @@ void FuncCommand::initFunc(vector<string> parameters) {
     func_map.emplace(make_pair(name, *f));
 }
 
+// exectue a declared function
 void FuncCommand::executeFunc(string name, double var, int client_socket) {
     // change every declared variable in func to its value
     for (string s : this->commands) {

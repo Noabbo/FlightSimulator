@@ -95,7 +95,7 @@ public:
     void initFunc(vector<string> parameters);
     virtual string execute(vector<string> parameters);
     void executeFunc(string name, double var, int client_socket);
-    virtual ~FuncCommand() {delete this;};
+    //virtual ~FuncCommand() {delete this;};
 };
 
 unordered_map<string, Command*> commands_map;
