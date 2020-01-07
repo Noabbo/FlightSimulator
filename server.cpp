@@ -45,7 +45,9 @@ vector<string> lexer(string file_name) {
     while (!text.eof()) {
         vector<string> help = helpLexer(line);
         for (string s : help) {
-            v.push_back(s);
+            if (!s.empty()) {
+                v.push_back(s);
+            }
         }
         getline(text, line);
     }
@@ -57,13 +59,13 @@ vector<string> helpLexer(string line) {
     vector<string> v;
     // open server command of sleep or print command
     if ((line.find("openDataServer") != string::npos)
-    || (line.find(lowerCase("openDataServer")) != string::npos)
-    || (line.find(upperCase("openDataServer")) != string::npos)
-    || (line.find("Sleep") != string::npos)
-    || (line.find(lowerCase("Sleep")) != string::npos)
-    || (line.find(upperCase("Sleep")) != string::npos)
-    || (line.find("Print") != string::npos) || (line.find(lowerCase("Print")) != string::npos)
-    || (line.find(upperCase("Print")) != string::npos)) {
+        || (line.find(lowerCase("openDataServer")) != string::npos)
+        || (line.find(upperCase("openDataServer")) != string::npos)
+        || (line.find("Sleep") != string::npos)
+        || (line.find(lowerCase("Sleep")) != string::npos)
+        || (line.find(upperCase("Sleep")) != string::npos)
+        || (line.find("Print") != string::npos) || (line.find(lowerCase("Print")) != string::npos)
+        || (line.find(upperCase("Print")) != string::npos)) {
         // enter name of command to vector
         auto startPos = line.find('(');
         v.push_back(removeSpaces(line.substr(0, startPos)));
@@ -77,8 +79,8 @@ vector<string> helpLexer(string line) {
         }
         v.push_back(par);
     } else if ((line.find("connectControlClient") != string::npos)
-    || (line.find(lowerCase("connectControlClient")) != string::npos)
-    || (line.find(upperCase("connectControlClient")) != string::npos)) {
+               || (line.find(lowerCase("connectControlClient")) != string::npos)
+               || (line.find(upperCase("connectControlClient")) != string::npos)) {
         // connect client command
         // enter name of command to vector
         auto startPos = line.find("(");
@@ -97,18 +99,22 @@ vector<string> helpLexer(string line) {
         // while, if function or define new function
         if (line.find("if") != string::npos) {
             v.emplace_back("if");
-            string condition = removeSpaces(line.substr(2, curlPos-2));
+            auto pos = line.find("if");
+            string condition = removeSpaces(line.substr(pos+2));
+            condition.pop_back();
             v.push_back(condition);
         } else if (line.find("while") != string::npos) {
             v.emplace_back("while");
-            string condition = removeSpaces(line.substr(5, curlPos-5));
+            auto pos = line.find("while");
+            string condition = removeSpaces(line.substr(pos+5));
+            condition.pop_back();
             v.push_back(condition);
         } else {
             auto startPos = line.find("(");
             string name = removeSpaces(line.substr(0, startPos));
             v.push_back(name);
             auto endPos = line.find(")");
-            string variable = removeSpaces(line.substr(startPos+1, endPos-startPos-1));
+            auto variable = line.substr(startPos + 1, endPos - startPos - 1);
             v.push_back(variable);
         }
         v.emplace_back("{");
@@ -177,8 +183,8 @@ vector<string> helpLexer(string line) {
             v.push_back(value);
             return v;
         }
-        // update var
-       else if (line.find("=") != string::npos) {
+            // update var
+        else if (line.find("=") != string::npos) {
             auto pos = line.find("=");
             string name = removeSpaces(line.substr(0, pos));
             v.push_back(name);
@@ -277,15 +283,15 @@ void parser(vector<string> rawConfig) {
         } else if (rawConfig[i + 2] == "{") {
             // undeclared function
             vector<string> block = findBlock(rawConfig, i);
-            block.insert(block.begin(), "FuncCommand");
-            game_operation.push_back(block);
+            // new command to declare
             if ((rawConfig[i] != "if") && (rawConfig[i] != "while")) {
-                block.insert(block.begin(), "0");
-                Command * c = new FuncCommand(block);
-                c->execute(block);
-                block.erase(block.begin());
+                FuncCommand *c = new FuncCommand(block);
+                c->initFunc(block);
+            } else {
+                block.insert(block.begin(), "FuncCommand");
+                game_operation.push_back(block);
             }
-            i += block.size() - 1;
+            i += block.size() + 1;
         } else if (func_map.find(rawConfig[i]) != func_map.end()) {
             // declared function
             // enter variable
@@ -296,7 +302,6 @@ void parser(vector<string> rawConfig) {
             }
             game_operation.push_back(func);
             i += PRINT_SLEEP_FUNC_RET_VALUE;
-
         } else if (game_configuration.find(rawConfig[i]) != game_configuration.end()) {
             // declared variable
             vector<string> var;
@@ -334,7 +339,6 @@ vector<string> findBlock(vector<string> coms, int pos) {
         }
         param.push_back(coms[pos++]);
     }
-
     // enter end of block
     param.emplace_back("}");
     return param;
@@ -345,22 +349,18 @@ string OpenServerCommand::execute(vector<string> parameters) {
     return "";
 }
 
-
 //Create the server
 void openServer(int port) {
-
     //Creation of the socket
     char buffer[1024];
     int socketfd = socket(AF_INET, SOCK_STREAM, 0);
     if (socketfd == -1) {
         throw "error - could not create a socket";
     }
-
     sockaddr_in serverAddress;
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_addr.s_addr = INADDR_ANY;
     serverAddress.sin_port = htons(port);
-
     //Case the bind socket doesn't bind to the IP address
     if (bind(socketfd, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) == -1) {
         throw "Could not bind the socket to an IP";
@@ -375,12 +375,11 @@ void openServer(int port) {
     if (client_socket == -1) {
         throw "Error- didn't accept client";
     }
-
     // The server keep listening to the client.
     while (ServerExist) {
         //Wait to listen from the client.
         int res = read(client_socket, buffer, sizeof(buffer));
-
+        // the server sent information
         if (buffer[0] != '\0') {
             mutex_lock.lock();
             vector<Variable>::iterator it;
@@ -441,7 +440,7 @@ void connectClient(const char *IP, int port,  unordered_map<string, Variable> ga
             for (i;  i < game_operation.size(); ++i) {
                 runExecute(game_operation[i], client_socket);
             }
-
+            // executions have finished
             if (i == game_operation.size()){
                 cout << "Connection Over " << endl;
                 break;
@@ -457,10 +456,9 @@ void connectClient(const char *IP, int port,  unordered_map<string, Variable> ga
 }
 
 void runExecute(vector<string> parameters, int client_socket) {
-
     string opType = parameters.front();
     Command *c = commands_map[opType];
-
+    // no matchimg command in list - two options
     if (c == nullptr) {
         if (opType == "FuncCommand") {
             parameters.erase(parameters.begin());
@@ -513,12 +511,10 @@ bool xmlParser() {
         xml_configuration.emplace(make_pair(node, *variable));
         element = element->NextSiblingElement();
     }
-
 }
 
 // command that defines a new or existing variable
 string DefineVarCommand::execute(vector<string> parameters) {
-
     string name;
     // define new variable
     if (parameters[0] == "var") {
@@ -667,21 +663,23 @@ string FuncCommand::execute(vector<string> parameters) {
                     run = false;
                 }
             }
-        } else {
-            // declare function
-            string name = parameters[0];
-            vector<string> block;
-            // create block of function
-            for (int j = 1; j < parameters.size(); j++) {
-                block.push_back(parameters[j]);
-            }
-            // create new func
-            auto *f = new FuncCommand(block);
-            // add new func to map
-            func_map.emplace(make_pair(name, *f));
         }
     }
     return "";
+}
+
+void FuncCommand::initFunc(vector<string> parameters) {
+    // declare function
+    string name = parameters[0];
+    vector<string> block;
+    // create block of function
+    for (int j = 1; j < parameters.size(); j++) {
+        block.push_back(parameters[j]);
+    }
+    // create new func
+    auto *f = new FuncCommand(block);
+    // add new func to map
+    func_map.emplace(make_pair(name, *f));
 }
 
 void FuncCommand::executeFunc(string name, double var, int client_socket) {

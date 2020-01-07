@@ -92,6 +92,7 @@ class FuncCommand : public Command {
     vector<string> commands;
 public:
     FuncCommand(vector<string> c);
+    void initFunc(vector<string> parameters);
     virtual string execute(vector<string> parameters);
     void executeFunc(string name, double var, int client_socket);
     virtual ~FuncCommand() {delete this;};
