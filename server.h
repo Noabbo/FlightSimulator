@@ -51,8 +51,10 @@ vector<string> findBlock(vector<string> coms, int pos);
 void openServer(int port);
 void connectClient(const char *IP, int port,  unordered_map<string, Variable> game_configuration,
         vector<vector<string>> game_value);
+void runExecute( vector<string> parameters, int client_sockect);
 bool xmlParser();
-void blockParser(vector<string> parameters, bool ifOrWhile);
+void blockParser(vector<string> parameters, bool ifOrWhile, int client_socket);
+
 // class of open server command
 class OpenServerCommand : public Command {
 public:
@@ -91,12 +93,13 @@ class FuncCommand : public Command {
 public:
     FuncCommand(vector<string> c);
     virtual string execute(vector<string> parameters);
-    void executeFunc(string name, double var);
+    void executeFunc(string name, double var, int client_socket);
     virtual ~FuncCommand() {delete this;};
 };
 
-unordered_map<string, Command*> commands;
+unordered_map<string, Command*> commands_map;
 vector<Variable> orderVars;
+unordered_map<string, Variable> xml_configuration;
 unordered_map<string, Variable> game_configuration;
 vector<vector<string>> game_operation;
 unordered_map<string, FuncCommand> func_map;

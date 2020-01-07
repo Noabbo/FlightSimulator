@@ -20,6 +20,7 @@ public:
     double getValue();
     string getName();
     bool getUpdateSimulator();
+    void setName(string name);
     void setValue(double v);
     void setUpdateSimulator(bool b);
     void setPath(string s);

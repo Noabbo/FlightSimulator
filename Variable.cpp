@@ -34,6 +34,9 @@ string Variable::getName() {
     return this->name;
 }
 // setters
+void Variable::setName(string n) {
+    this->name = n;
+}
 void Variable::setValue(double v) {
     this->value = v;
 }
