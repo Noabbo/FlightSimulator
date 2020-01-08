@@ -480,7 +480,7 @@ void connectClient(const char *IP, int port,  unordered_map<string, Variable> ga
 }
 
 // run the commands in txt file
-void runExecute(vector<string> parameters, int client_socket) {
+int runExecute(vector<string> parameters, int client_socket) {
     string opType = parameters.front();
     Command *c = commands_map[opType];
     // no matchimg command in list - two options
@@ -490,6 +490,7 @@ void runExecute(vector<string> parameters, int client_socket) {
             c = new FuncCommand(parameters);
             parameters.insert(parameters.begin(), to_string(client_socket));
             c->execute(parameters);
+            return parameters.size()-1;
         } else if (opType == "DefineVarCommand") {
             parameters.erase(parameters.begin());
             c = new DefineVarCommand();
@@ -500,40 +501,47 @@ void runExecute(vector<string> parameters, int client_socket) {
                  auto rel = write(client_socket, updateSimulator.c_str(), updateSimulator.size() + 1);
             }
         } else if (opType == "{") {
+            int ret_val = 0;
+            auto pos = parameters.begin();
+            while (*pos != "}") {
+                ret_val++;
+            }
             mutex_lock.lock();
             parameters.erase(parameters.begin());
             parameters.erase(parameters.end());
-            Command *c;
+            Command *com;
             vector<string> operation;
             while (parameters.begin() != parameters.end()) {
                 if (game_configuration.find(parameters.front()) != game_configuration.end()) {
-                    c = new DefineVarCommand();
+                    com = new DefineVarCommand();
                     for (int j = 0; j < 3; j++) {
                         operation.push_back(parameters.front());
                         parameters.erase(parameters.begin());
                     }
                 } else {
                     if (parameters.front() == "Sleep") {
-                        c = new SleepCommand();
+                        com = new SleepCommand();
                     } else {
-                        c = new PrintCommand();
+                        com = new PrintCommand();
                     }
                     for (int j = 0; j < 2; j++) {
                         operation.push_back(parameters.front());
                         parameters.erase(parameters.begin());
                     }
                 }
-               // mutex_lock.lock();
-                c->execute(operation);
+                com->execute(operation);
                 mutex_lock.unlock();
                 operation.clear();
             }
+            return ret_val;
         }
     } else {
         mutex_lock.lock();
         c->execute(parameters);
         mutex_lock.unlock();
+        return PRINT_SLEEP_FUNC_RET_VALUE;
     }
+    return 0;
 }
 
 // translates the xml file
@@ -765,6 +773,7 @@ void FuncCommand::executeFunc(double var, int client_socket) {
 
 // calls parser for a block
 void blockParser(vector<string> parameters, bool ifOrWhile, int client_socket) {
+    int jump;
     // remove variable from parameters
     parameters.erase(parameters.begin());
     if (ifOrWhile) {
@@ -772,18 +781,24 @@ void blockParser(vector<string> parameters, bool ifOrWhile, int client_socket) {
         parameters.erase(parameters.begin());
     }
     // run the commands in block until '}'
-    int pos = 0;
-    while (pos < parameters.size()) {
+    auto pos = parameters.begin();
+    while (pos != parameters.end()) {
         // skip opening bracket
-        if (parameters[pos] != "{") {
+        if (*pos != "{") {
+            if ((*pos == "if") || (*pos == "while")) {
+                parameters.insert(pos, "FuncCommand");
+            }
             // execute commands in block
-            runExecute(parameters, client_socket);
-            pos++;
+            jump = runExecute(parameters, client_socket);
         } else {
-            parameters.erase(parameters.begin());
+            jump = 1;
+        }
+        for (int i = 0; i < jump; i++) {
+            parameters.erase(pos);
         }
     }
 }
+
 // sleep command
 string SleepCommand::execute(vector<string> parameters) {
     Interpreter *i = new Interpreter(game_configuration);
