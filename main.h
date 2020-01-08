@@ -51,7 +51,7 @@ vector<string> findBlock(vector<string> coms, int pos);
 void openServer(int port);
 void connectClient(const char *IP, int port,  unordered_map<string, Variable> game_configuration,
         vector<vector<string>> game_value);
-int runExecute( vector<string> parameters, int client_sockect);
+void runExecute( vector<string> parameters, int client_sockect);
 bool xmlParser();
 void blockParser(vector<string> parameters, bool ifOrWhile, int client_socket);
 

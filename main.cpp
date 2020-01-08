@@ -435,7 +435,7 @@ void openServer(int port) {
 
 //Create connection with the server
 void connectClient(const char *IP, int port,  unordered_map<string, Variable> game_configuration,
-        vector<vector<string>> game_operation) {
+                   vector<vector<string>> game_operation) {
     //Creation of the socket
     int client_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (client_socket == -1) {
@@ -443,7 +443,7 @@ void connectClient(const char *IP, int port,  unordered_map<string, Variable> ga
     }
     sockaddr_in address;
     address.sin_family = AF_INET;
-   // address.sin_addr.s_addr = inet_addr(IP);
+    // address.sin_addr.s_addr = inet_addr(IP);
     address.sin_port = htons(port);
     cout << "Client " << IP <<" " << port << endl;
 
@@ -480,17 +480,16 @@ void connectClient(const char *IP, int port,  unordered_map<string, Variable> ga
 }
 
 // run the commands in txt file
-int runExecute(vector<string> parameters, int client_socket) {
+void runExecute(vector<string> parameters, int client_socket) {
     string opType = parameters.front();
     Command *c = commands_map[opType];
-    // no matchimg command in list - two options
+    // no matching command in list - two options
     if (c == nullptr) {
         if (opType == "FuncCommand") {
             parameters.erase(parameters.begin());
             c = new FuncCommand(parameters);
             parameters.insert(parameters.begin(), to_string(client_socket));
             c->execute(parameters);
-            return parameters.size()-1;
         } else if (opType == "DefineVarCommand") {
             parameters.erase(parameters.begin());
             c = new DefineVarCommand();
@@ -498,50 +497,43 @@ int runExecute(vector<string> parameters, int client_socket) {
             string updateSimulator = c->execute(parameters);
             mutex_lock.unlock();
             if (!updateSimulator.empty()) {
-                 auto rel = write(client_socket, updateSimulator.c_str(), updateSimulator.size() + 1);
+                auto rel = write(client_socket, updateSimulator.c_str(), updateSimulator.size() + 1);
             }
         } else if (opType == "{") {
-            int ret_val = 0;
-            auto pos = parameters.begin();
-            while (*pos != "}") {
-                ret_val++;
-            }
             mutex_lock.lock();
             parameters.erase(parameters.begin());
             parameters.erase(parameters.end());
-            Command *com;
+            Command *c;
             vector<string> operation;
             while (parameters.begin() != parameters.end()) {
                 if (game_configuration.find(parameters.front()) != game_configuration.end()) {
-                    com = new DefineVarCommand();
+                    c = new DefineVarCommand();
                     for (int j = 0; j < 3; j++) {
                         operation.push_back(parameters.front());
                         parameters.erase(parameters.begin());
                     }
                 } else {
                     if (parameters.front() == "Sleep") {
-                        com = new SleepCommand();
+                        c = new SleepCommand();
                     } else {
-                        com = new PrintCommand();
+                        c = new PrintCommand();
                     }
                     for (int j = 0; j < 2; j++) {
                         operation.push_back(parameters.front());
                         parameters.erase(parameters.begin());
                     }
                 }
-                com->execute(operation);
+                // mutex_lock.lock();
+                c->execute(operation);
                 mutex_lock.unlock();
                 operation.clear();
             }
-            return ret_val;
         }
     } else {
         mutex_lock.lock();
         c->execute(parameters);
         mutex_lock.unlock();
-        return PRINT_SLEEP_FUNC_RET_VALUE;
     }
-    return 0;
 }
 
 // translates the xml file
@@ -773,7 +765,6 @@ void FuncCommand::executeFunc(double var, int client_socket) {
 
 // calls parser for a block
 void blockParser(vector<string> parameters, bool ifOrWhile, int client_socket) {
-    int jump;
     // remove variable from parameters
     parameters.erase(parameters.begin());
     if (ifOrWhile) {
@@ -781,24 +772,9 @@ void blockParser(vector<string> parameters, bool ifOrWhile, int client_socket) {
         parameters.erase(parameters.begin());
     }
     // run the commands in block until '}'
-    auto pos = parameters.begin();
-    while (pos != parameters.end()) {
-        // skip opening bracket
-        if (*pos != "{") {
-            if ((*pos == "if") || (*pos == "while")) {
-                parameters.insert(pos, "FuncCommand");
-            }
-            // execute commands in block
-            jump = runExecute(parameters, client_socket);
-        } else {
-            jump = 1;
-        }
-        for (int i = 0; i < jump; i++) {
-            parameters.erase(pos);
-        }
-    }
+            parameters.erase(parameters.begin());
+            runExecute(parameters, client_socket);
 }
-
 // sleep command
 string SleepCommand::execute(vector<string> parameters) {
     Interpreter *i = new Interpreter(game_configuration);

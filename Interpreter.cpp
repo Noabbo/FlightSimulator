@@ -35,7 +35,8 @@ Expression* Interpreter::interpret(string equation) {
                 // UMinus or UPlus
                 if (((equation[i] == '-') || (equation[i] == '+')) && ((((equation[i+1] > 47) && (equation[i+1] < 58))
                                                                         && (((equation[i-1] == '(')) || (i == 0))) ||
-                                                                       ((equation[i+1] == '(') && ((i == 0) || (equation[i-1] == '('))))) {
+                                                                       ((equation[i+1] == '(') && ((i == 0) || (equation[i-1] == '('))))
+                                                                       || ((equation[i] == '-') && (i == 0))) {
                     string s;
                     if (equation[i] == '-') {
                         s.push_back('-');
@@ -101,7 +102,7 @@ Expression* Interpreter::interpret(string equation) {
                 name.insert(0, tokens.front());
                 double value = variables.at(tokens.front()).getValue();
                 Expression *e = new Variable(tokens.front(), value, variables.at(tokens.front()).getUpdateSimulator(),
-                         variables.at(tokens.front()).getPath());
+                                             variables.at(tokens.front()).getPath());
                 finalStack.push_back(e);
                 tokens.pop();
                 // token is an operand
@@ -114,7 +115,7 @@ Expression* Interpreter::interpret(string equation) {
                     Expression *exp = finalStack.back();
                     finalStack.pop_back();
                     if (operand.compare("--") == 0) {
-                       e = new UMinus(exp);
+                        e = new UMinus(exp);
                     } else {
                         e = new UPlus(exp);
                     }
@@ -205,8 +206,7 @@ bool Interpreter::isStringValid(string equation) {
                 if (!isNumValid(var)) {
                     throw ("invalid number");
                 }
-            } else if ((equation[i] == '+') || (equation[i] == '-') ||
-                       (equation[i] == '*') || (equation[i] == '/')) {
+            } else if ((equation[i] == '+') || (equation[i] == '*') || (equation[i] == '/')) {
                 // consecutive operands
                 throw ("syntax error - missing variable or value");
             }
@@ -369,8 +369,8 @@ string Interpreter::findVarOrNum(string equation, int pos) {
     unsigned int i = pos;
     string var;
     while ((i < equation.length()) && (equation[i] != '+') &&
-        (equation[i] != '-') && (equation[i] != '*') && (equation[i] != '/') &&
-            (equation[i] != '(') && (equation[i] != ')')) {
+           (equation[i] != '-') && (equation[i] != '*') && (equation[i] != '/') &&
+           (equation[i] != '(') && (equation[i] != ')')) {
         var.push_back(equation[i]);
         i++;
     }
