@@ -3,7 +3,7 @@
 //
 #include <stdexcept>
 #include "Div.h"
-
+// constructor
 Div::Div(Expression *l, Expression *r) : BinaryOperator(l, r) {}
 
 // getters

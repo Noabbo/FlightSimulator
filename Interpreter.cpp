@@ -7,6 +7,7 @@
 Interpreter::Interpreter(unordered_map<string, Variable> vars_map) {
     this->variables = std::move(vars_map);
 }
+// interprets an expression
 Expression* Interpreter::interpret(string equation) {
     Expression *final = nullptr;
     list <string> stack;
@@ -150,7 +151,7 @@ Expression* Interpreter::interpret(string equation) {
     }
     return final;
 }
-
+// finds which operator is more precedent
 bool Interpreter::isOpMorePrecedent(char op, string check) {
     if ((op == '(') || (op == ')') || (check.compare("(") == 0) || (check.compare(")") == 0)) {
         return true;
@@ -178,7 +179,7 @@ bool Interpreter::isOpMorePrecedent(char op, string check) {
     }
     return true;
 }
-
+// makes sure the string of expression is valid
 bool Interpreter::isStringValid(string equation) {
     // spaces are allowed
     if ((isspace(equation[0])) || (equation[0] == '\t')) {
@@ -340,7 +341,7 @@ bool Interpreter::isStringValid(string equation) {
     }
     return true;
 }
-
+// finds if expression has brackets
 bool Interpreter::hasNoBrackets(string equation) {
     for (char i : equation) {
         if ((i == '(') || (i == ')')) {
@@ -349,7 +350,7 @@ bool Interpreter::hasNoBrackets(string equation) {
     }
     return true;
 }
-
+// extracts the variable or the number
 string Interpreter::findVarOrNum(string equation, int pos) {
     unsigned int i = pos;
     string var;
@@ -361,11 +362,11 @@ string Interpreter::findVarOrNum(string equation, int pos) {
     }
     return var;
 }
-
+// makes sure the variable is valid
 bool Interpreter::isVarValid(string var) {
     return !(variables.find(var) == variables.end());
 }
-
+// makes sure the number is valid
 bool Interpreter::isNumValid(string num) {
     int dot = 0;
     for (char j : num) {
