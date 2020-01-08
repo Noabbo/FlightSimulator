@@ -293,6 +293,20 @@ bool Interpreter::isStringValid(string equation) {
                         }
                         string part = equation.substr(num.length() + 1, string::npos);
                         return isStringValid(part);
+                    } else if (((equation[0] > 96) && (equation[0] < 123)) ||
+                               ((equation[0] > 64) && (equation[0] < 91))) {
+                        string v = findVarOrNum(equation, i);
+                        // string not found as variable in map
+                        if (!isVarValid(v)) {
+                            throw ("variable doesn't exist or doesn't have value");
+                        }
+                        if ((equation[v.length()] != '+') && (equation[v.length()] != '-') &&
+                            (equation[v.length()] != '*') && (equation[v.length()] != '/')) {
+                            // consecutive variables
+                            throw ("syntax error - missing operand");
+                        }
+                        string part = equation.substr(v.length() + 1, string::npos);
+                        return isStringValid(part);
                     }
                     break;
                 case '+':
