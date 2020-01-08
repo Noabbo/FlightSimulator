@@ -167,6 +167,7 @@ vector<string> helpLexer(string line) {
         // end of block
         v.emplace_back("}");
     } else {
+        // update var, call a function or condition
         if (line.find("<") != string::npos) {
             auto pos = line.find("<");
             auto posEnd = pos;
@@ -181,14 +182,33 @@ vector<string> helpLexer(string line) {
             v.push_back(condition);
             string value = removeSpaces(line.substr(posEnd+1));
             v.push_back(value);
-            return v;
-        }
-            // update var
-        else if (line.find("=") != string::npos) {
-            auto pos = line.find("=");
+        } else if (line.find(">") != string::npos) {
+            auto pos = line.find(">");
+            auto posEnd = pos;
+            auto cond = 1;
+            if (line.find(">=") != string::npos) {
+                posEnd += 1;
+                cond++;
+            }
             string name = removeSpaces(line.substr(0, pos));
             v.push_back(name);
-            string value = removeSpaces(line.substr(pos+1));
+            string condition = removeSpaces(line.substr(pos, cond));
+            v.push_back(condition);
+            string value = removeSpaces(line.substr(posEnd+1));
+            v.push_back(value);
+        } else if (line.find("=") != string::npos) {
+            auto pos = line.find("=");
+            auto posEnd = pos;
+            auto cond = 1;
+            if ((line.find("==") != string::npos) || (line.find("!=") != string::npos)) {
+                posEnd += 1;
+                cond++;
+            }
+            string name = removeSpaces(line.substr(0, pos));
+            v.push_back(name);
+            string condition = removeSpaces(line.substr(pos, cond));
+            v.push_back(condition);
+            string value = removeSpaces(line.substr(posEnd+1));
             v.push_back(value);
         } else {
             // calling a function
@@ -259,8 +279,7 @@ void parser(vector<string> rawConfig) {
                 }
                 game_operation.push_back(command);
                 i += ALIAS_RET_VALUE;
-            }
-            else {
+            } else {
                 //Initialisation of the variables
                 Command *c = new DefineVarCommand();
                 vector<string> command;
@@ -589,13 +608,19 @@ string DefineVarCommand::execute(vector<string> parameters) {
         // update existing variable
         // extracting the name and new value of variable
         name = parameters[0];
-        string exp = parameters[1];
+        string exp = parameters[2];
         // calculating new value of variable
         auto i = new Interpreter(game_configuration);
         Expression* e = i->interpret(exp);
         double value = e->calculate();
-        // set new value in map
+        // set new value in map and list
         game_configuration.at(name).setValue(value);
+        for (Variable v : orderVars) {
+            if (v.getName() == name) {
+                v.setValue(value);
+                break;
+            }
+        }
         // simulator needs to be updated
         if (game_configuration.at(name).getUpdateSimulator()) {
             string updateSim = "set";
@@ -623,8 +648,16 @@ FuncCommand::FuncCommand(vector<string> c) {
 string FuncCommand::execute(vector<string> parameters) {
     //Give the socket of the client
     int client_socket = stoi(parameters[0]);
+    bool isDeclaredFunc = true;
+    // find out what type of function to handle
+    for (string s : parameters) {
+        if (s == "{") {
+            isDeclaredFunc = false;
+            break;
+        }
+    }
     // Run declared function
-    if (parameters.size() < 4) {
+    if (isDeclaredFunc) {
         auto f = func_map.at(parameters[1]);
         Interpreter *i = new Interpreter(game_configuration);
         Expression *e = i->interpret(parameters[2]);
@@ -646,9 +679,6 @@ string FuncCommand::execute(vector<string> parameters) {
             // condition is true
             if (boo->calculate() == 1) {
                 blockParser(parameters, true, client_socket);
-            } else {
-                // condition is false
-                throw "condition is false";
             }
         } else if (parameters[1] == "while") {
             bool run = true;
@@ -692,16 +722,15 @@ void FuncCommand::initFunc(vector<string> parameters) {
 // execute a declared function
 void FuncCommand::executeFunc(double var, int client_socket) {
     // find name of variable
-    vector<string> variable = helpLexer(this->commands[1]);
-    // change every declared variable in func to its value
-    for (string s : this->commands) {
-        while (s.find(variable[1]) != string::npos) {
-            auto pos = s.find(variable[1]);
-            s.replace(pos, variable[1].size(), to_string(var));
-        }
-    }
+    auto posVar = this->commands[0].find(" ");
+    string variable = removeSpaces(this->commands[0].substr(posVar));
+    Variable *v = new Variable(variable, var, false, "");
+    // add local variable to map
+    game_configuration.emplace(make_pair(variable, *v));
     // execute function
     blockParser(this->commands, false, client_socket);
+    // remove local variable from map
+    game_configuration.erase(game_configuration.find(variable));
 }
 
 // calls parser for a block
@@ -718,19 +747,17 @@ void blockParser(vector<string> parameters, bool ifOrWhile, int client_socket) {
         // skip opening bracket
         if (parameters[pos] != "{") {
             // execute commands in block
-            parameters.pop_back();
             runExecute(parameters, client_socket);
+            pos++;
         } else {
             parameters.erase(parameters.begin());
         }
-        pos++;
     }
 }
 // sleep command
 string SleepCommand::execute(vector<string> parameters) {
-    double num = parameters.size() - 1;
     Interpreter *i = new Interpreter(game_configuration);
-    Expression *e = i->interpret(parameters[num]);
+    Expression *e = i->interpret(parameters[1]);
     double time = e->calculate();
     sleep(time);
     return "";
@@ -738,16 +765,15 @@ string SleepCommand::execute(vector<string> parameters) {
 
 // print command
 string PrintCommand::execute(vector<string> parameters) {
-    double num = parameters.size() - 1;
     // string to print
-    if (parameters[num].at(0) == '"') {
-        string str = parameters[num].substr(1);
+    if (parameters[1].at(0) == '"') {
+        string str = parameters[1].substr(1);
         str.pop_back();
         cout << str << endl;
     } else {
         // expression to calculate and print result
         auto *i = new Interpreter(game_configuration);
-        Expression *e = i->interpret(parameters[num]);
+        Expression *e = i->interpret(parameters[1]);
         double num = e->calculate();
         cout << num << endl;
     }

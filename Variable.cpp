@@ -41,7 +41,6 @@ void Variable::setValue(double v) {
     this->value = v;
 }
 
-
 void Variable::setPath(string s) {
     this->path = s;
 }
