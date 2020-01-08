@@ -259,7 +259,6 @@ void parser(vector<string> rawConfig) {
                 }
                 game_operation.push_back(command);
                 i += ALIAS_RET_VALUE;
-
             }
             else {
                 //Initialisation of the variables
@@ -283,15 +282,15 @@ void parser(vector<string> rawConfig) {
         } else if (rawConfig[i + 2] == "{") {
             // undeclared function
             vector<string> block = findBlock(rawConfig, i);
+            block.insert(block.begin(), "FuncCommand");
             // new command to declare
             if ((rawConfig[i] != "if") && (rawConfig[i] != "while")) {
                 FuncCommand *c = new FuncCommand(block);
                 c->initFunc(block);
             } else {
-                block.insert(block.begin(), "FuncCommand");
                 game_operation.push_back(block);
             }
-            i += block.size() + 1;
+            i += block.size()-1;
         } else if (func_map.find(rawConfig[i]) != func_map.end()) {
             // declared function
             // enter variable
@@ -327,7 +326,7 @@ vector<string> findBlock(vector<string> coms, int pos) {
     bool first = true;
     int count = 1;
     // entering condition and block to vector
-    while ((coms[pos] != "}") && (count != 0)) {
+    while (count > 0) {
         if (coms[pos] == "{") {
             if (!first) {
                 count++;
@@ -336,11 +335,17 @@ vector<string> findBlock(vector<string> coms, int pos) {
         }
         if ((coms[pos] == "}") && (count > 0)) {
             count--;
+        } else if ((coms[pos] == "}") && (count == 0)) {
+            // and of block
+            param.emplace_back("}");
+            break;
         }
         param.push_back(coms[pos++]);
     }
     // enter end of block
-    param.emplace_back("}");
+    /*for (int i = 0; i < count; i++) {
+        param.emplace_back("}");
+    }*/
     return param;
 }
 // command to create and connect server
@@ -618,14 +623,13 @@ FuncCommand::FuncCommand(vector<string> c) {
 string FuncCommand::execute(vector<string> parameters) {
     //Give the socket of the client
     int client_socket = stoi(parameters[0]);
-
     // Run declared function
-    if (parameters[3] != "{") {
-        auto f = func_map.at(parameters[2]);
+    if (parameters.size() < 4) {
+        auto f = func_map.at(parameters[1]);
         Interpreter *i = new Interpreter(game_configuration);
         Expression *e = i->interpret(parameters[2]);
         double var = e->calculate();
-        f.executeFunc(parameters[1], var, client_socket);
+        f.executeFunc(var, client_socket);
         // run function
         return "";
     } else {
@@ -673,10 +677,10 @@ string FuncCommand::execute(vector<string> parameters) {
 // initializing new function
 void FuncCommand::initFunc(vector<string> parameters) {
     // declare function
-    string name = parameters[0];
+    string name = parameters[1];
     vector<string> block;
     // create block of function
-    for (int j = 1; j < parameters.size(); j++) {
+    for (int j = 2; j < parameters.size(); j++) {
         block.push_back(parameters[j]);
     }
     // create new func
@@ -685,13 +689,15 @@ void FuncCommand::initFunc(vector<string> parameters) {
     func_map.emplace(make_pair(name, *f));
 }
 
-// exectue a declared function
-void FuncCommand::executeFunc(string name, double var, int client_socket) {
+// execute a declared function
+void FuncCommand::executeFunc(double var, int client_socket) {
+    // find name of variable
+    vector<string> variable = helpLexer(this->commands[1]);
     // change every declared variable in func to its value
     for (string s : this->commands) {
-        while (s.find(name) != string::npos) {
-            auto pos = s.find(name);
-            s.replace(pos, name.size(), to_string(var));
+        while (s.find(variable[1]) != string::npos) {
+            auto pos = s.find(variable[1]);
+            s.replace(pos, variable[1].size(), to_string(var));
         }
     }
     // execute function
