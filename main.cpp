@@ -361,10 +361,6 @@ vector<string> findBlock(vector<string> coms, int pos) {
         }
         param.push_back(coms[pos++]);
     }
-    // enter end of block
-    /*for (int i = 0; i < count; i++) {
-        param.emplace_back("}");
-    }*/
     return param;
 }
 // command to create and connect server
@@ -480,16 +476,19 @@ void connectClient(const char *IP, int port,  unordered_map<string, Variable> ga
 }
 
 // run the commands in txt file
-void runExecute(vector<string> parameters, int client_socket) {
+int runExecute(vector<string> parameters, int client_socket) {
     string opType = parameters.front();
     Command *c = commands_map[opType];
     // no matchimg command in list - two options
     if (c == nullptr) {
-        if (opType == "FuncCommand") {
-            parameters.erase(parameters.begin());
+        if ((opType == "FuncCommand") || (opType == "while") || (opType == "if")) {
+            if (opType == "FuncCommand") {
+                parameters.erase(parameters.begin());
+            }
             c = new FuncCommand(parameters);
             parameters.insert(parameters.begin(), to_string(client_socket));
             c->execute(parameters);
+            return parameters.size()-1;
         } else if (opType == "DefineVarCommand") {
             parameters.erase(parameters.begin());
             c = new DefineVarCommand();
@@ -499,12 +498,18 @@ void runExecute(vector<string> parameters, int client_socket) {
             if (!updateSimulator.empty()) {
                  auto rel = write(client_socket, updateSimulator.c_str(), updateSimulator.size() + 1);
             }
+            return NEW_VALUE_OF_VARIABLE_RET_VALUE;
         }
     } else {
         mutex_lock.lock();
         c->execute(parameters);
         mutex_lock.unlock();
+        if (opType == "DefineVarCommand") {
+            return NEW_VALUE_OF_VARIABLE_RET_VALUE;
+        }
+        return PRINT_SLEEP_FUNC_RET_VALUE;
     }
+    return 0;
 }
 
 // translates the xml file
@@ -681,23 +686,22 @@ string FuncCommand::execute(vector<string> parameters) {
                 blockParser(parameters, true, client_socket);
             }
         } else if (parameters[1] == "while") {
-            bool run = true;
-            while (run) {
-                Interpreter *i = new Interpreter(game_configuration);
-                string cond = parameters[2];
-                vector<string> condition = helpLexer(cond);
-                // left part of the condition
-                Expression *l = i->interpret(condition[0]);
+            Interpreter *i = new Interpreter(game_configuration);
+            string cond = parameters[2];
+            vector<string> condition = helpLexer(cond);
+            // left part of the condition
+            Expression *l = i->interpret(condition[0]);
+            // right part of the condition
+            Expression *r = i->interpret(condition[2]);
+            BooleanType *boo = new BooleanType(l, r, condition[1]);
+            // as long as the condition is true
+            while (boo->calculate() == 1) {
+                blockParser(parameters, true, client_socket);
+                // check condition again
+                l = i->interpret(condition[0]);
                 // right part of the condition
-                Expression *r = i->interpret(condition[2]);
-                BooleanType *boo = new BooleanType(l, r, condition[1]);
-                // condition is true
-                if (boo->calculate() == 1) {
-                    blockParser(parameters, true, client_socket);
-                } else {
-                    // condition is false
-                    run = false;
-                }
+                r = i->interpret(condition[2]);
+                boo = new BooleanType(l, r, condition[1]);
             }
         }
     }
@@ -735,6 +739,7 @@ void FuncCommand::executeFunc(double var, int client_socket) {
 
 // calls parser for a block
 void blockParser(vector<string> parameters, bool ifOrWhile, int client_socket) {
+    int jump;
     // remove variable from parameters
     parameters.erase(parameters.begin());
     if (ifOrWhile) {
@@ -742,15 +747,17 @@ void blockParser(vector<string> parameters, bool ifOrWhile, int client_socket) {
         parameters.erase(parameters.begin());
     }
     // run the commands in block until '}'
-    int pos = 0;
-    while (pos < parameters.size()) {
+    auto pos = parameters.begin();
+    while (pos != parameters.end()) {
         // skip opening bracket
-        if (parameters[pos] != "{") {
+        if (*pos != "{") {
             // execute commands in block
-            runExecute(parameters, client_socket);
-            pos++;
+            jump = runExecute(parameters, client_socket);
         } else {
-            parameters.erase(parameters.begin());
+            jump = 1;
+        }
+        for (int i = 0; i < jump; i++) {
+            parameters.erase(pos);
         }
     }
 }
